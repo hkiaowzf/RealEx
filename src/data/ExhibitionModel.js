@@ -35,8 +35,8 @@ export function createExhibition(overrides = {}) {
 }
 
 export function createFloor(overrides = {}) {
-  const width = overrides.width || 12;
-  const depth = overrides.depth || 8;
+  const width = overrides.width || 30;
+  const depth = overrides.depth || 30;
   const grid = [];
   for (let x = 0; x < width; x++) {
     grid[x] = [];

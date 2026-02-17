@@ -66,8 +66,8 @@ export class Store {
       this._setConstraintError(`最多只能创建 ${this.maxFloors} 层`);
       return null;
     }
-    const width = Number(overrides.width) || 12;
-    const depth = Number(overrides.depth) || 8;
+    const width = Number(overrides.width) || 30;
+    const depth = Number(overrides.depth) || 30;
     if (width * depth > this.maxFloorArea) {
       this._setConstraintError(`单层面积不能超过 ${this.maxFloorArea} 平方米`);
       return null;

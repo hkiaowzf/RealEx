@@ -63,14 +63,14 @@ describe('createExhibition', () => {
 });
 
 describe('createFloor', () => {
-  it('creates floor with default 12x8 grid of EMPTY cells', () => {
+  it('creates floor with default 30x30 grid of EMPTY cells', () => {
     const floor = createFloor();
-    expect(floor.width).toBe(12);
-    expect(floor.depth).toBe(8);
-    expect(floor.grid.length).toBe(12);
-    expect(floor.grid[0].length).toBe(8);
-    for (let x = 0; x < 12; x++) {
-      for (let z = 0; z < 8; z++) {
+    expect(floor.width).toBe(30);
+    expect(floor.depth).toBe(30);
+    expect(floor.grid.length).toBe(30);
+    expect(floor.grid[0].length).toBe(30);
+    for (let x = 0; x < 30; x++) {
+      for (let z = 0; z < 30; z++) {
         expect(floor.grid[x][z]).toBe(CellType.EMPTY);
       }
     }

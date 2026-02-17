@@ -58,7 +58,7 @@ export class GridEditor {
     this._staticDirtyRects = [];
     this._drawRaf = null;
 
-    this.cellSize = 40;
+    this.cellSize = 20;
     this.panX = 0;
     this.panY = 0;
     this.isPanning = false;
@@ -381,6 +381,51 @@ export class GridEditor {
       });
     }
     if (dirty) ctx.restore();
+
+    // Draw scale indicator (bottom-right of grid)
+    if (!dirty) {
+      this._renderScaleIndicator(ctx, floor, rect);
+    }
+  }
+
+  _renderScaleIndicator(ctx, floor, rect) {
+    const cs = this.cellSize;
+    const px = this.panX;
+    const py = this.panY;
+    const gridRight = px + floor.width * cs;
+    const gridBottom = py + floor.depth * cs;
+    const margin = 8;
+    const barLen = cs * 5;
+    const barX = gridRight - barLen;
+    const barY = gridBottom + margin + 4;
+
+    // Scale bar line
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(barX, barY);
+    ctx.lineTo(barX + barLen, barY);
+    ctx.stroke();
+    // End ticks
+    ctx.beginPath();
+    ctx.moveTo(barX, barY - 4);
+    ctx.lineTo(barX, barY + 4);
+    ctx.moveTo(barX + barLen, barY - 4);
+    ctx.lineTo(barX + barLen, barY + 4);
+    ctx.stroke();
+
+    // Label: "5m"
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#666';
+    ctx.fillText('5m', barX + barLen / 2, barY + 5);
+
+    // Description text
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText('1格 = 1m × 1m', gridRight, barY + 20);
   }
 
   _renderDynamicLayer(floor) {
@@ -1200,7 +1245,7 @@ export class GridEditor {
   }
 
   resetView() {
-    this.cellSize = 40;
+    this.cellSize = 20;
     this._centerGrid();
   }
 
@@ -1231,7 +1276,7 @@ export class GridEditor {
   }
 
   getZoomPercent() {
-    return Math.round((this.cellSize / 40) * 100);
+    return Math.round((this.cellSize / 20) * 100);
   }
 
   destroy() {

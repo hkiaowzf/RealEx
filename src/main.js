@@ -38,7 +38,7 @@ if (saved && saved.exhibition) {
   Persistence.restore(store, saved);
 } else {
   store.initExhibition({ name: '我的展览' });
-  store.addFloor({ width: 12, depth: 8, label: 'L1' });
+  store.addFloor({ width: 30, depth: 30, label: 'L1' });
 }
 store.sanitizeEscalatorLinks();
 
