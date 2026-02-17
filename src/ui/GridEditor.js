@@ -82,6 +82,14 @@ export class GridEditor {
     this._applyToolCursor();
     this._onResize = () => this._resize();
     window.addEventListener('resize', this._onResize, { signal: this._eventController.signal });
+
+    // Tips bar
+    if (!this.readOnly && !this.tenantView) {
+      this._tipsEl = document.createElement('div');
+      this._tipsEl.className = 'grid-tips-bar';
+      this.container.appendChild(this._tipsEl);
+      this._updateTips();
+    }
   }
 
   _subscribeStore() {
@@ -97,6 +105,7 @@ export class GridEditor {
       this._pendingBoothRect = null;
       this.boothDrawRect = null;
       this._applyToolCursor();
+      this._updateTips();
       this.draw(true);
     }));
     this._unsubs.push(bus.on('escalator-links-changed', () => this.draw(true)));
@@ -1107,6 +1116,22 @@ export class GridEditor {
       return;
     }
     this.canvas.style.cursor = this._toolCursor(store.editTool);
+  }
+
+  _updateTips() {
+    if (!this._tipsEl) return;
+    const tips = {
+      select: '点击选中展位或设施 · Delete 删除 · 拖拽可移动 · Alt+拖拽平移画布',
+      corridor: '点击放置通道 · 按住拖动连续绘制 · 再次点击已有通道可取消',
+      restricted: '点击放置限制区 · 按住拖动连续绘制',
+      entrance: '点击放置入口 · 按住拖动连续绘制',
+      ledScreen: '点击放置 LED 屏 · 按住拖动连续绘制',
+      elevator: '点击放置电梯',
+      escalator: '点击放置扶梯 · 拖拽已有扶梯可移动位置',
+      boothTemplate: '点击空白区域放置展位模板',
+      boothDraw: '点击或拖选空白格子 · 按 Enter 确认创建展位 · Esc 取消'
+    };
+    this._tipsEl.textContent = tips[store.editTool] || '';
   }
 
   _handleClick(x, z) {

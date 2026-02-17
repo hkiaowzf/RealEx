@@ -26,7 +26,7 @@ export class TopBar {
     this.el.innerHTML = `
       <div class="topbar-left">
         <div class="brand">
-          <div class="brand-title">ExpoGrid 3D</div>
+          <div class="brand-title">RealExpo</div>
         </div>
         <input class="expo-name-input" id="expo-name" type="text"
                value="${store.exhibition?.name || ''}" placeholder="展览名称" />
