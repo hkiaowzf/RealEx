@@ -1121,17 +1121,22 @@ export class GridEditor {
   _updateTips() {
     if (!this._tipsEl) return;
     const tips = {
-      select: '点击选中展位或设施 · Delete 删除 · 拖拽可移动 · Alt+拖拽平移画布',
-      corridor: '点击放置通道 · 按住拖动连续绘制 · 再次点击已有通道可取消',
-      restricted: '点击放置限制区 · 按住拖动连续绘制',
-      entrance: '点击放置入口 · 按住拖动连续绘制',
-      ledScreen: '点击放置 LED 屏 · 按住拖动连续绘制',
-      elevator: '点击放置电梯',
-      escalator: '点击放置扶梯 · 拖拽已有扶梯可移动位置',
-      boothTemplate: '点击空白区域放置展位模板',
-      boothDraw: '点击或拖选空白格子 · 按 Enter 确认创建展位 · Esc 取消'
+      select: ['点击选中展位或设施', 'Delete 删除选中项', '拖拽可移动展位', 'Alt+拖拽平移画布'],
+      corridor: ['点击放置通道', '按住拖动连续绘制', '再次点击已有通道可取消'],
+      restricted: ['点击放置限制区', '按住拖动连续绘制'],
+      entrance: ['点击放置入口', '按住拖动连续绘制'],
+      ledScreen: ['点击放置 LED 屏', '按住拖动连续绘制'],
+      elevator: ['点击放置电梯'],
+      escalator: ['点击放置扶梯', '拖拽已有扶梯可移动位置'],
+      boothTemplate: ['点击空白区域放置展位模板'],
+      boothDraw: ['点击或拖选空白格子选区', '按 Enter 确认创建展位', 'Esc 取消当前选区']
     };
-    this._tipsEl.textContent = tips[store.editTool] || '';
+    const list = tips[store.editTool];
+    if (!list || !list.length) {
+      this._tipsEl.textContent = '';
+      return;
+    }
+    this._tipsEl.textContent = list[Math.floor(Math.random() * list.length)];
   }
 
   _handleClick(x, z) {
