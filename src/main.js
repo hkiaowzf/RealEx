@@ -1,5 +1,6 @@
 import { bus } from './utils/EventBus.js';
 import { store } from './data/Store.js';
+import { CellType } from './data/ExhibitionModel.js';
 import { Persistence } from './utils/Persistence.js';
 import { TopBar } from './ui/TopBar.js';
 import { LeftPanel } from './ui/LeftPanel.js';
@@ -38,7 +39,43 @@ if (saved && saved.exhibition) {
   Persistence.restore(store, saved);
 } else {
   store.initExhibition({ name: '我的展览' });
+  // Floor 1
   store.addFloor({ width: 30, depth: 30, label: 'L1' });
+  // Floor 2
+  store.addFloor({ width: 30, depth: 30, label: 'L2' });
+
+  // Helper: seed a floor with demo elements
+  const seedFloor = (floorIndex) => {
+    store.setActiveFloor(floorIndex);
+    // Elevators at (3,3) and (3,4)
+    store.setCell(3, 3, CellType.ELEVATOR);
+    store.setCell(3, 4, CellType.ELEVATOR);
+    // Escalators at (5,3) and (5,4) — symmetric pair
+    store.setCell(5, 3, CellType.ESCALATOR);
+    store.setCell(5, 4, CellType.ESCALATOR);
+    // 3×3 booths at four positions
+    const boothOrigins = [[6,6],[12,6],[12,12],[12,20]];
+    for (const [ox, oz] of boothOrigins) {
+      const cells = [];
+      for (let dx = 0; dx < 3; dx++) {
+        for (let dz = 0; dz < 3; dz++) {
+          cells.push({ x: ox + dx, z: oz + dz });
+        }
+      }
+      store.addBooth(cells);
+    }
+  };
+  seedFloor(0);
+  seedFloor(1);
+
+  // Link escalators between L1 and L2 (symmetric pair)
+  store.addEscalatorLink(0, 5, 3, 1, 5, 3, false);
+  store.addEscalatorLink(0, 5, 4, 1, 5, 4, false);
+
+  // Reset to L1
+  store.setActiveFloor(0);
+  // Clear undo stack so demo content is fully deletable without undo artifacts
+  store.undoStack = [];
 }
 store.sanitizeEscalatorLinks();
 
