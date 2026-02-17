@@ -1403,8 +1403,9 @@ body.tenant-view .expo-name-input {
   .hamburger-btn:active { background: var(--border); }
 
   /* Left panel: drawer */
-  .stage { grid-template-columns: 1fr; }
+  .stage { grid-template-columns: 1fr; grid-template-rows: 1fr; }
   .panel {
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
@@ -1419,11 +1420,12 @@ body.tenant-view .expo-name-input {
     overflow-y: auto;
   }
   .panel.drawer-open {
+    display: flex;
     transform: translateX(0);
   }
 
   /* Canvas full-screen */
-  #editor-area, #viewport-area { min-height: 0; }
+  .work-area { height: 100%; }
 
   /* Collapsible action bar */
   .canvas-action-toggle {
