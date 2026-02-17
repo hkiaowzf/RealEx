@@ -1,0 +1,23 @@
+{
+  "name": "expogrid-3d",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "start": "npm run dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.0.0",
+    "happy-dom": "^17.0.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "three": "^0.161.0"
+  }
+}
