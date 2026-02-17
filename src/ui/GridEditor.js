@@ -47,6 +47,7 @@ export class GridEditor {
     this.readOnly = !!options.readOnly;
     this.tenantView = !!options.tenantView;
     this.lockZoom = !!options.lockZoom;
+    this._mobileQuery = window.matchMedia('(max-width: 768px)');
     this.tenantHighlightBoothId = String(options.tenantHighlightBoothId || '');
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'grid-canvas';
@@ -129,6 +130,10 @@ export class GridEditor {
   }
 
   _centerGrid() {
+    if (this._mobileQuery.matches) {
+      this.fitToView();
+      return;
+    }
     const floor = store.activeFloor;
     if (!floor) return;
     const rect = this.container.getBoundingClientRect();

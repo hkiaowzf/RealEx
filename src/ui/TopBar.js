@@ -25,6 +25,7 @@ export class TopBar {
   _render() {
     this.el.innerHTML = `
       <div class="topbar-left">
+        <button class="hamburger-btn mobile-only" id="hamburger-btn" title="菜单">&#9776;</button>
         <div class="brand">
           <div class="brand-title">RealExpo</div>
         </div>
@@ -36,8 +37,8 @@ export class TopBar {
         <button class="btn-icon" id="add-floor-btn" title="添加楼层">+</button>
       </div>
       <div class="topbar-right">
-        ${this.isTenantView ? '' : '<button class="btn-sm" id="invite-history-btn" title="查看承租人反馈记录">邀约历史</button>'}
-        ${this.isTenantView ? '' : '<button class="btn-accent" id="tenant-share-btn" title="复制展位邀约页面链接">展位邀约</button>'}
+        ${this.isTenantView ? '' : '<button class="btn-sm desktop-only" id="invite-history-btn" title="查看承租人反馈记录">邀约历史</button>'}
+        ${this.isTenantView ? '' : '<button class="btn-accent desktop-only" id="tenant-share-btn" title="复制展位邀约页面链接">展位邀约</button>'}
         <div class="mode-toggle" id="mode-toggle">
           <button class="mode-btn active" data-mode="edit">${this.isTenantView ? '平面' : '编辑'}</button>
           <button class="mode-btn" data-mode="preview">${this.isTenantView ? '3D' : '预览'}</button>
@@ -162,6 +163,10 @@ export class TopBar {
 
   _bind() {
     this.el.addEventListener('click', e => {
+      if (e.target.closest('#hamburger-btn')) {
+        bus.emit('toggle-left-drawer');
+        return;
+      }
       const tab = e.target.closest('.floor-tab');
       const remove = e.target.closest('.tab-close');
       if (remove) {

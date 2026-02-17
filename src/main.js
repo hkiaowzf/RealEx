@@ -336,6 +336,41 @@ const offEditModeChanged = bus.on('edit-mode-changed', updateMode);
 updateMode();
 vpControls.startAutoUpdate();
 
+// --- Mobile detection & auto-fit ---
+const mobileQuery = window.matchMedia('(max-width: 768px)');
+function onMobileChange() {
+  document.body.classList.toggle('is-mobile', mobileQuery.matches);
+  if (mobileQuery.matches && store.editMode === 'edit') {
+    gridEditor.fitToView();
+  }
+}
+mobileQuery.addEventListener('change', onMobileChange);
+onMobileChange();
+
+// Re-fit on orientation change (mobile)
+window.addEventListener('orientationchange', () => {
+  if (!mobileQuery.matches) return;
+  setTimeout(() => {
+    if (store.editMode === 'edit') {
+      gridEditor.fitToView();
+    } else {
+      sceneManager?.fitToView?.();
+    }
+  }, 200);
+});
+
+// Mode switch auto-fit on mobile
+bus.on('edit-mode-changed', () => {
+  if (!mobileQuery.matches) return;
+  requestAnimationFrame(() => {
+    if (store.editMode === 'edit') {
+      gridEditor.fitToView();
+    } else {
+      sceneManager?.fitToView?.();
+    }
+  });
+});
+
 // Global shortcuts:
 // - Command/Ctrl + Shift + P => switch to preview mode
 // - Command/Ctrl + E (or Command/Ctrl + Shift + E) => switch to edit mode

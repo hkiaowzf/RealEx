@@ -31,6 +31,15 @@ export class LeftPanel {
   constructor(container) {
     this.el = container;
     this._unsubs = [];
+    this._drawerOpen = false;
+    this._mobileQuery = window.matchMedia('(max-width: 768px)');
+
+    // Create backdrop
+    this._backdrop = document.createElement('div');
+    this._backdrop.className = 'panel-drawer-backdrop';
+    document.body.appendChild(this._backdrop);
+    this._backdrop.addEventListener('click', () => this._closeDrawer());
+
     this._bindOnce();
     this._render();
     this._unsubs.push(bus.on('active-floor-changed', () => this._update()));
@@ -44,6 +53,7 @@ export class LeftPanel {
     this._unsubs.push(bus.on('tool-changed', () => {
       this._updateToolbar();
       this._updateTemplateOptions();
+      if (this._mobileQuery.matches) this._closeDrawer();
     }));
     this._unsubs.push(bus.on('edit-mode-changed', () => this._render()));
     this._unsubs.push(bus.on('escalator-links-changed', () => {
@@ -52,6 +62,27 @@ export class LeftPanel {
     }));
     this._unsubs.push(bus.on('view-filter-changed', () => this._updateViewControls()));
     this._unsubs.push(bus.on('floor-annotations-changed', () => this._updateViewControls()));
+    this._unsubs.push(bus.on('toggle-left-drawer', () => this._toggleDrawer()));
+  }
+
+  _openDrawer() {
+    this._drawerOpen = true;
+    this.el.classList.add('drawer-open');
+    this._backdrop.classList.add('open');
+  }
+
+  _closeDrawer() {
+    this._drawerOpen = false;
+    this.el.classList.remove('drawer-open');
+    this._backdrop.classList.remove('open');
+  }
+
+  _toggleDrawer() {
+    if (this._drawerOpen) {
+      this._closeDrawer();
+    } else {
+      this._openDrawer();
+    }
   }
 
   _loadInviteHistory() {
@@ -553,6 +584,7 @@ export class LeftPanel {
     this._onClick = null;
     this._onChange = null;
     this._onStorage = null;
+    try { this._backdrop?.remove(); } catch {}
     this._unsubs.forEach(off => {
       try { off(); } catch {}
     });
