@@ -70,7 +70,7 @@ export class Persistence {
   }
 
   // --- Version history ---
-  static saveVersion(store, label) {
+  static saveVersion(store, label, preview) {
     try {
       const versions = Persistence.getVersions();
       const snapshot = Persistence.serialize(store);
@@ -78,6 +78,7 @@ export class Persistence {
         return { saved: false, reason: 'no-change' };
       }
       snapshot.label = label || Persistence._autoLabel();
+      if (preview) snapshot.preview = preview;
       versions.unshift(snapshot);
       if (versions.length > MAX_VERSIONS) versions.length = MAX_VERSIONS;
       localStorage.setItem(VERSIONS_KEY, JSON.stringify(versions));
