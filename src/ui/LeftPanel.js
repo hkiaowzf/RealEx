@@ -27,6 +27,15 @@ const VIEW_FILTERS = [
   { value: 'ledScreen', label: 'LED屏' }
 ];
 
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const modKey = isMac ? 'Cmd' : 'Ctrl';
+
+const ESCALATOR_DIRECTION_OPTIONS = [
+  { value: 'up', label: '上行 ↑' },
+  { value: 'down', label: '下行 ↓' },
+  { value: 'bidirectional', label: '双向 ⇅' }
+];
+
 export class LeftPanel {
   constructor(container) {
     this.el = container;
@@ -62,6 +71,7 @@ export class LeftPanel {
     }));
     this._unsubs.push(bus.on('view-filter-changed', () => this._updateViewControls()));
     this._unsubs.push(bus.on('floor-annotations-changed', () => this._updateViewControls()));
+    this._unsubs.push(bus.on('file-switched', () => this._update()));
     this._unsubs.push(bus.on('toggle-left-drawer', () => this._toggleDrawer()));
   }
 
@@ -166,11 +176,11 @@ export class LeftPanel {
       <div class="panel-section">
         <div class="panel-title">快捷键</div>
         <div class="shortcut-list">
-          <div class="shortcut-row"><span>切换编辑</span><code>Cmd/Ctrl + E</code></div>
-          <div class="shortcut-row"><span>切换预览</span><code>Cmd/Ctrl + Shift + P</code></div>
-          <div class="shortcut-row"><span>保存版本</span><code>Cmd/Ctrl + Shift + S</code></div>
-          <div class="shortcut-row"><span>适配视图</span><code>Cmd/Ctrl + Shift + F</code></div>
-          <div class="shortcut-row"><span>撤销</span><code>Cmd/Ctrl + Z</code></div>
+          <div class="shortcut-row"><span>切换编辑</span><code>${modKey} + E</code></div>
+          <div class="shortcut-row"><span>切换预览</span><code>${modKey} + Shift + P</code></div>
+          <div class="shortcut-row"><span>保存版本</span><code>${modKey} + Shift + S</code></div>
+          <div class="shortcut-row"><span>适配视图</span><code>${modKey} + Shift + F</code></div>
+          <div class="shortcut-row"><span>撤销</span><code>${modKey} + Z</code></div>
         </div>
       </div>
       <div class="panel-section">
@@ -339,6 +349,8 @@ export class LeftPanel {
     let linksHtml = '';
     if (cell.type === CellType.ESCALATOR && links.length > 0) {
       linksHtml = links.map(l => {
+        const direction = this._normalizeEscalatorDirection(l.direction);
+        const localDirection = this._getLocalEscalatorDirectionLabel(l, store.activeFloorIndex);
         const otherFloor = l.floorA === store.activeFloorIndex ? l.floorB : l.floorA;
         const otherX = l.floorA === store.activeFloorIndex ? l.xB : l.xA;
         const otherZ = l.floorA === store.activeFloorIndex ? l.zB : l.zA;
@@ -346,6 +358,16 @@ export class LeftPanel {
           <div class="panel-row">
             <span>连接楼层</span>
             <strong>L${otherFloor + 1} (${otherX}, ${otherZ})</strong>
+          </div>
+          <div class="panel-row">
+            <span>方向</span>
+            ${isEdit
+              ? `<select class="booth-input" data-link-direction-id="${l.id}">
+                  ${ESCALATOR_DIRECTION_OPTIONS.map(o => `
+                    <option value="${o.value}" ${direction === o.value ? 'selected' : ''}>${o.label}</option>
+                  `).join('')}
+                </select>`
+              : `<strong>${localDirection}</strong>`}
           </div>
           ${isEdit ? `<button class="btn-sm" data-link-remove-id="${l.id}">移除关联</button>` : ''}
         `;
@@ -364,6 +386,12 @@ export class LeftPanel {
             </option>
           `).join('')}
         </select>
+        <div class="panel-row">
+          <span>方向</span>
+          <select id="escalator-link-direction" class="booth-input" ${isEdit ? '' : 'disabled'}>
+            ${ESCALATOR_DIRECTION_OPTIONS.map(o => `<option value="${o.value}">${o.label}</option>`).join('')}
+          </select>
+        </div>
         <button id="add-escalator-link" class="btn-sm" ${(isEdit && options.length) ? '' : 'disabled'}>添加关联</button>
         ${isEdit ? '' : '<div class="muted">切换到编辑模式后可配置扶梯上下关联</div>'}
       `;
@@ -403,6 +431,20 @@ export class LeftPanel {
       }
     });
     return options;
+  }
+
+  _normalizeEscalatorDirection(direction) {
+    if (direction === 'up' || direction === 'down' || direction === 'bidirectional') return direction;
+    return 'bidirectional';
+  }
+
+  _getLocalEscalatorDirectionLabel(link, floorIndex) {
+    const direction = this._normalizeEscalatorDirection(link.direction);
+    if (direction === 'bidirectional') return '双向 ⇅';
+    const atFloorA = floorIndex === link.floorA;
+    const up = direction === 'up';
+    if (atFloorA) return up ? '上行 ↑' : '下行 ↓';
+    return up ? '下行 ↓' : '上行 ↑';
   }
 
   _update() {
@@ -509,7 +551,9 @@ export class LeftPanel {
         const [floorA, xA, zA, floorB, xB, zB] = store.activeFloorIndex < otherFloor
           ? [store.activeFloorIndex, selected.x, selected.z, otherFloor, otherX, otherZ]
           : [otherFloor, otherX, otherZ, store.activeFloorIndex, selected.x, selected.z];
-        const created = store.addEscalatorLink(floorA, xA, zA, floorB, xB, zB);
+        const directionEl = this.el.querySelector('#escalator-link-direction');
+        const direction = String(directionEl?.value || 'bidirectional');
+        const created = store.addEscalatorLink(floorA, xA, zA, floorB, xB, zB, true, direction);
         if (created) {
           bus.emit('toast', { message: '扶梯关联已生效', duration: 1200 });
         } else {
@@ -539,6 +583,19 @@ export class LeftPanel {
       }
       if (e.target.id === 'toggle-floor-annotations') {
         store.setShowFloorAnnotations(e.target.checked);
+        return;
+      }
+      const directionSelect = e.target.closest('[data-link-direction-id]');
+      if (directionSelect) {
+        const linkId = directionSelect.getAttribute('data-link-direction-id');
+        const nextDirection = directionSelect.value;
+        if (linkId) {
+          const ok = store.updateEscalatorLinkDirection(linkId, nextDirection);
+          bus.emit('toast', {
+            message: ok ? '已更新扶梯方向' : '方向更新失败',
+            duration: 1200
+          });
+        }
         return;
       }
       if (!store.selectedBoothId) return;

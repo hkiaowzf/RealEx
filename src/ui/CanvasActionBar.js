@@ -1,6 +1,7 @@
 import { bus } from '../utils/EventBus.js';
 import { store } from '../data/Store.js';
 import { Persistence } from '../utils/Persistence.js';
+import { Auth } from '../utils/Auth.js';
 
 export class CanvasActionBar {
   constructor(editorArea, viewportArea) {
@@ -30,49 +31,45 @@ export class CanvasActionBar {
     el.className = 'canvas-action-bar';
     el.dataset.mode = mode;
 
-    // Toggle button (mobile-only)
-    const toggle = document.createElement('button');
-    toggle.className = 'canvas-action-toggle mobile-only';
-    toggle.textContent = '\u22EF';
-    toggle.title = '操作';
-    toggle.addEventListener('click', () => this._toggleCollapse(el), { signal: this._eventController.signal });
-    el.appendChild(toggle);
-
-    // Buttons container
+    // Main buttons container
     const btns = document.createElement('div');
     btns.className = 'canvas-action-buttons';
     btns.innerHTML = `
-      <button class="btn-sm" data-action="backup-export" title="导出本地备份">备份</button>
-      <button class="btn-sm" data-action="backup-import" title="读取本地备份">恢复</button>
       <button class="btn-sm" data-action="save-version" title="保存当前版本">保存</button>
-      <button class="btn-sm" data-action="open-history" title="查看版本历史">历史版本</button>
+      <button class="btn-sm canvas-action-more-toggle" data-action="toggle-more" title="更多操作">\u22EF</button>
     `;
     el.appendChild(btns);
 
-    // Start collapsed on mobile
-    if (this._mobileQuery.matches) {
-      btns.classList.add('collapsed');
-    }
+    // More menu (dropdown)
+    const more = document.createElement('div');
+    more.className = 'canvas-action-more hidden';
+    more.innerHTML = `
+      <button class="btn-sm" data-action="new-file" title="创建新的展览文件">新建文件</button>
+      <button class="btn-sm" data-action="backup-export" title="导出本地备份">备份</button>
+      <button class="btn-sm" data-action="backup-import" title="读取本地备份">恢复</button>
+      <button class="btn-sm" data-action="open-history" title="查看版本历史">历史版本</button>
+    `;
+    el.appendChild(more);
+
     return el;
   }
 
-  _toggleCollapse(barEl) {
-    const btns = barEl.querySelector('.canvas-action-buttons');
-    if (!btns) return;
-    btns.classList.toggle('collapsed');
+  _toggleMore(barEl) {
+    const more = barEl.querySelector('.canvas-action-more');
+    if (!more) return;
+    more.classList.toggle('hidden');
   }
 
-  _collapseAll() {
+  _closeAllMore() {
     [this.editorBar, this.viewportBar].forEach(bar => {
-      bar?.querySelector('.canvas-action-buttons')?.classList.add('collapsed');
+      bar?.querySelector('.canvas-action-more')?.classList.add('hidden');
     });
   }
 
   _bindOutsideClick() {
     document.addEventListener('pointerdown', e => {
-      if (!this._mobileQuery.matches) return;
       if (e.target.closest('.canvas-action-bar')) return;
-      this._collapseAll();
+      this._closeAllMore();
     }, { signal: this._eventController.signal });
   }
 
@@ -81,26 +78,66 @@ export class CanvasActionBar {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
+      if (action === 'toggle-more') {
+        this._toggleMore(barEl);
+        return;
+      }
       if (action === 'backup-export') {
         this._exportBackup();
-        if (this._mobileQuery.matches) this._collapseAll();
+        this._closeAllMore();
+        return;
+      }
+      if (action === 'new-file') {
+        this._createNewFile();
+        this._closeAllMore();
         return;
       }
       if (action === 'backup-import') {
         this.fileInput.click();
-        if (this._mobileQuery.matches) this._collapseAll();
+        this._closeAllMore();
         return;
       }
       if (action === 'save-version') {
         bus.emit('save-version-requested');
-        if (this._mobileQuery.matches) this._collapseAll();
+        this._closeAllMore();
         return;
       }
       if (action === 'open-history') {
         bus.emit('history-requested');
-        if (this._mobileQuery.matches) this._collapseAll();
+        this._closeAllMore();
       }
     }, { signal: this._eventController.signal });
+  }
+
+  _nextExhibitionName(sequence) {
+    const seq = Number(sequence) > 0 ? Number(sequence) : 1;
+    return `我的展览 ${seq}`;
+  }
+
+  _createNewFile() {
+    const metas = Persistence.listFiles();
+    if (metas.length >= 1 && !Auth.getCurrentUser()) {
+      bus.emit('auth-required', {
+        reason: 'multi-file-create',
+        message: '创建第2个及以上展览文件前，请先登录或注册'
+      });
+      return;
+    }
+
+    const name = this._nextExhibitionName(metas.length + 1);
+    Persistence.save(store);
+    Persistence.createFile(name);
+
+    store.initExhibition({ name });
+    const floor = store.addFloor({ width: 30, depth: 30, label: 'L1' });
+    if (!floor && store.lastConstraintError) {
+      bus.emit('toast', { message: store.lastConstraintError, duration: 1700 });
+      return;
+    }
+    store.setActiveFloor(0);
+    store.undoStack = [];
+    Persistence.save(store);
+    bus.emit('toast', { message: `已创建新展览文件：${name}`, duration: 1600 });
   }
 
   _bindFileInput() {

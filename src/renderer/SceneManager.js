@@ -19,9 +19,9 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 500);
     this.camera.position.set(15, 18, 15);
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = this._createRenderer(canvas);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    this.renderer.setSize(rect.width, rect.height);
+    this._setRendererSizeFromCanvas(rect);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -65,6 +65,41 @@ export class SceneManager {
     this.controls.addEventListener('end', this._onControlsEnd);
     this.controls.addEventListener('change', this._onControlsChange);
     this.requestRender();
+  }
+
+  _createRenderer(canvas) {
+    try {
+      return new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        powerPreference: 'high-performance'
+      });
+    } catch {
+      // Mobile fallback: disable antialias to reduce context creation pressure.
+      return new THREE.WebGLRenderer({
+        canvas,
+        antialias: false,
+        powerPreference: 'low-power'
+      });
+    }
+  }
+
+  _setRendererSizeFromCanvas(rect = null) {
+    const bounds = rect || this.canvas.getBoundingClientRect();
+    const parent = this.canvas.parentElement;
+    const width = Math.max(
+      1,
+      Math.floor(bounds?.width || 0),
+      Math.floor(parent?.clientWidth || 0)
+    );
+    const height = Math.max(
+      1,
+      Math.floor(bounds?.height || 0),
+      Math.floor(parent?.clientHeight || 0)
+    );
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height, false);
   }
 
   _setMouseMode() {
@@ -130,9 +165,16 @@ export class SceneManager {
     }));
     this._unsubs.push(bus.on('booth-selected', () => this._refreshBoothStyles()));
     this._unsubs.push(bus.on('cell-selected', () => this._refreshBoothStyles()));
+    this._unsubs.push(bus.on('file-switched', () => this._onFileSwitched()));
     this._unsubs.push(bus.on('edit-mode-changed', mode => {
       if (mode !== 'preview') this._resetKeyState();
     }));
+  }
+
+  _onFileSwitched() {
+    this._resetKeyState();
+    this.rebuildAll();
+    this.requestRender();
   }
 
   _onGridChanged(payload) {
@@ -308,11 +350,7 @@ export class SceneManager {
   }
 
   _onResize() {
-    const rect = this.canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    this.camera.aspect = rect.width / rect.height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(rect.width, rect.height);
+    this._setRendererSizeFromCanvas();
     this.requestRender();
   }
 

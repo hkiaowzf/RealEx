@@ -112,6 +112,20 @@ export class GridEditor {
     this._unsubs.push(bus.on('escalator-links-changed', () => this.draw(true)));
     this._unsubs.push(bus.on('cell-selected', () => this.draw(true)));
     this._unsubs.push(bus.on('view-filter-changed', () => this.draw(true)));
+    this._unsubs.push(bus.on('file-switched', () => this._onFileSwitched()));
+  }
+
+  _onFileSwitched() {
+    this._pendingPan = null;
+    this._pendingBoothMove = null;
+    this._pendingCellMove = null;
+    this._pendingDrag = null;
+    this._pendingBoothRect = null;
+    this.boothDrawRect = null;
+    this.ghostPos = null;
+    this._staticDirty = true;
+    this._staticDirtyRects = [];
+    this._centerGrid();
   }
 
   _resize() {
@@ -209,6 +223,20 @@ export class GridEditor {
       escalator: CellType.ESCALATOR
     };
     return map[filter] === type;
+  }
+
+  _normalizeEscalatorDirection(direction) {
+    if (direction === 'up' || direction === 'down' || direction === 'bidirectional') return direction;
+    return 'bidirectional';
+  }
+
+  _getLocalEscalatorArrow(link, floorIdx) {
+    const direction = this._normalizeEscalatorDirection(link.direction);
+    if (direction === 'bidirectional') return '\u21D5';
+    const atFloorA = floorIdx === link.floorA;
+    const isUp = direction === 'up';
+    if (atFloorA) return isUp ? '\u2191' : '\u2193';
+    return isUp ? '\u2193' : '\u2191';
   }
 
   _onGridChanged(payload) {
@@ -385,7 +413,8 @@ export class GridEditor {
           otherFloor = link.floorA;
         } else return;
         if (cellX >= floor.width || cellZ >= floor.depth) return;
-        const label = `→L${otherFloor + 1}`;
+        const arrow = this._getLocalEscalatorArrow(link, floorIdx);
+        const label = `${arrow} L${otherFloor + 1}`;
         ctx.fillStyle = '#ffeb3b';
         ctx.fillText(label, px + (cellX + 0.5) * cs, py + cellZ * cs + cs * 0.18);
         // Highlight linked escalator cells with a border
@@ -743,18 +772,22 @@ export class GridEditor {
       if (store.editTool === 'escalator') {
         if (floor && x >= 0 && z >= 0 && x < floor.width && z < floor.depth &&
             floor.grid[x][z] === CellType.ESCALATOR) {
-          const linksAtCell = store.findEscalatorLinksAt(store.activeFloorIndex, x, z);
-          if (linksAtCell.length > 0) {
-            this._pendingDrag = {
-              floorIndex: store.activeFloorIndex,
-              origX: x, origZ: z,
-              startScreenX: e.clientX, startScreenY: e.clientY,
-              pointerId: e.pointerId
-            };
-            // Don't start drag yet — wait for move
-            // Still call handleClick for selection
-            this._handleClick(x, z);
-            return;
+          // Avoid conflict with link-association workflow:
+          // escalator move is explicit (Shift+drag), default click only selects.
+          if (e.shiftKey) {
+            const linksAtCell = store.findEscalatorLinksAt(store.activeFloorIndex, x, z);
+            if (linksAtCell.length > 0) {
+              this._pendingDrag = {
+                floorIndex: store.activeFloorIndex,
+                origX: x, origZ: z,
+                startScreenX: e.clientX, startScreenY: e.clientY,
+                pointerId: e.pointerId
+              };
+              // Don't start drag yet — wait for move
+              // Still call handleClick for selection
+              this._handleClick(x, z);
+              return;
+            }
           }
         }
       }
@@ -782,6 +815,12 @@ export class GridEditor {
           }
           const cellType = floor.grid[x][z];
           if (store.isMovableCellType?.(cellType)) {
+            if (cellType === CellType.ESCALATOR && !e.shiftKey) {
+              // Escalator association is frequent; require Shift to drag-move.
+              store.selectCell(x, z, cellType);
+              this.draw(true);
+              return;
+            }
             // Always reselect to force selected-info panel refresh
             // (prevents stale UI when gesture state consumed previous updates).
             store.selectCell(x, z, cellType);
@@ -1081,17 +1120,25 @@ export class GridEditor {
   }
 
   _toolCursor(tool) {
+    if (tool === 'select') {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'>
+        <defs>
+          <linearGradient id='mouseArrowSilver' x1='0' y1='0' x2='1' y2='1'>
+            <stop offset='0%' stop-color='#f8fbff' />
+            <stop offset='45%' stop-color='#d6dce4' />
+            <stop offset='100%' stop-color='#8f98a3' />
+          </linearGradient>
+        </defs>
+        <path d='M3.2 2.2L3.8 13.4L7.2 10.6L9.5 17.2L12.1 16.2L9.8 9.6L14.2 9.9Z'
+              fill='url(#mouseArrowSilver)' stroke='#5f6771' stroke-width='0.9' />
+      </svg>`;
+      return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") 3 2, auto`;
+    }
+
     const pointerBase = `
       <path d='M26 26 L6 6 L8 18 L12 14 L17 26 L21 24 L16 12 L24 12 Z'
             fill='#11131f' stroke='white' stroke-width='1'/>
     `;
-
-    if (tool === 'select') {
-      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>
-        ${pointerBase}
-      </svg>`;
-      return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") 6 6, auto`;
-    }
 
     if (tool === 'boothDraw') {
       const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>
@@ -1132,7 +1179,7 @@ export class GridEditor {
       entrance: ['点击放置入口', '按住拖动连续绘制'],
       ledScreen: ['点击放置 LED 屏', '按住拖动连续绘制'],
       elevator: ['点击放置电梯'],
-      escalator: ['点击放置扶梯', '拖拽已有扶梯可移动位置'],
+      escalator: ['点击选择扶梯用于关联', '按住 Shift + 拖拽可移动扶梯位置'],
       boothTemplate: ['点击空白区域放置展位模板'],
       boothDraw: ['点击或拖选空白格子选区', '按 Enter 确认创建展位', 'Esc 取消当前选区']
     };

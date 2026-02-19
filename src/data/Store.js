@@ -598,18 +598,24 @@ export class Store {
   }
 
   // --- Escalator Links ---
+  _normalizeEscalatorDirection(direction) {
+    if (direction === 'up' || direction === 'down' || direction === 'bidirectional') return direction;
+    return 'bidirectional';
+  }
+
   get escalatorLinks() {
     return this.exhibition ? this.exhibition.escalatorLinks : [];
   }
 
-  addEscalatorLink(floorA, xA, zA, floorB, xB, zB, captureUndo = true) {
+  addEscalatorLink(floorA, xA, zA, floorB, xB, zB, captureUndo = true, direction = 'bidirectional') {
     if (!this.exhibition) return null;
     if (Math.abs(floorA - floorB) !== 1) return null;
     if (captureUndo) this._captureUndoSnapshot();
     const link = {
       id: crypto.randomUUID(),
       floorA, xA, zA,
-      floorB, xB, zB
+      floorB, xB, zB,
+      direction: this._normalizeEscalatorDirection(direction)
     };
     this.exhibition.escalatorLinks.push(link);
     this._invalidateEscalatorLinkIndex();
@@ -625,6 +631,18 @@ export class Store {
     this.exhibition.escalatorLinks.splice(idx, 1);
     this._invalidateEscalatorLinkIndex();
     bus.emit('escalator-links-changed', this.escalatorLinks);
+  }
+
+  updateEscalatorLinkDirection(linkId, direction) {
+    const link = this.escalatorLinks.find(l => l.id === linkId);
+    if (!link) return false;
+    const nextDirection = this._normalizeEscalatorDirection(direction);
+    if (link.direction === nextDirection) return true;
+    this._captureUndoSnapshot();
+    link.direction = nextDirection;
+    this._invalidateEscalatorLinkIndex();
+    bus.emit('escalator-links-changed', this.escalatorLinks);
+    return true;
   }
 
   moveEscalatorEndpoint(linkId, floorIndex, newX, newZ) {
@@ -740,8 +758,17 @@ export class Store {
     this.exhibition.escalatorLinks.forEach(link => {
       if (typeof link.floorA !== 'number' || typeof link.floorB !== 'number') return;
       if (link.floorA <= link.floorB) {
-        normalized.push(link);
+        normalized.push({
+          ...link,
+          direction: this._normalizeEscalatorDirection(link.direction)
+        });
       } else {
+        const dir = this._normalizeEscalatorDirection(link.direction);
+        const swappedDirection = dir === 'up'
+          ? 'down'
+          : dir === 'down'
+            ? 'up'
+            : 'bidirectional';
         normalized.push({
           ...link,
           floorA: link.floorB,
@@ -749,7 +776,8 @@ export class Store {
           zA: link.zB,
           floorB: link.floorA,
           xB: link.xA,
-          zB: link.zA
+          zB: link.zA,
+          direction: swappedDirection
         });
       }
     });

@@ -85,7 +85,12 @@ export class VerticalLinkRenderer {
     this.group.add(edges);
 
     // Flow arrows
-    this._addFlowArrows(wx, yBottom + 0.3, yTop - 0.1, wz, wx, wz, ARROW_COLOR_ELEV);
+    this._addFlowArrows(
+      new THREE.Vector3(wx, yBottom + 0.3, wz),
+      new THREE.Vector3(wx, yTop - 0.1, wz),
+      ARROW_COLOR_ELEV,
+      'bidirectional'
+    );
   }
 
   _renderEscalatorLink(link, floors) {
@@ -109,10 +114,15 @@ export class VerticalLinkRenderer {
     const yA = link.floorA * FLOOR_GAP + 0.1;
     const yB = link.floorB * FLOOR_GAP + 0.1;
 
-    this._addEscalator(wxA, wzA, yA, wxB, wzB, yB);
+    this._addEscalator(wxA, wzA, yA, wxB, wzB, yB, this._normalizeEscalatorDirection(link.direction));
   }
 
-  _addEscalator(wxA, wzA, yA, wxB, wzB, yB) {
+  _normalizeEscalatorDirection(direction) {
+    if (direction === 'up' || direction === 'down' || direction === 'bidirectional') return direction;
+    return 'bidirectional';
+  }
+
+  _addEscalator(wxA, wzA, yA, wxB, wzB, yB, direction = 'bidirectional') {
     const height = yB - yA;
     const dx = wxB - wxA;
     const dz = wzB - wzA;
@@ -166,18 +176,27 @@ export class VerticalLinkRenderer {
     }
 
     // Flow arrows along the escalator
-    this._addFlowArrows(wxA, yA + 0.2, yB - 0.1, wzA, wxB, wzB, ARROW_COLOR_ESC);
+    this._addFlowArrows(
+      new THREE.Vector3(wxA, yA + 0.2, wzA),
+      new THREE.Vector3(wxB, yB - 0.1, wzB),
+      ARROW_COLOR_ESC,
+      direction
+    );
   }
 
-  _addFlowArrows(wxStart, yBottom, yTop, wzStart, wxEnd, wzEnd, color) {
+  _addFlowArrows(start, end, color, direction = 'bidirectional') {
+    const mode = this._normalizeEscalatorDirection(direction);
+    const from = mode === 'down' ? end : start;
+    const to = mode === 'down' ? start : end;
+
     // Line from start to end with interpolation
     const pts = [];
     const segments = 12;
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
-      const px = wxStart + (wxEnd - wxStart) * t;
-      const py = yBottom + (yTop - yBottom) * t;
-      const pz = wzStart + (wzEnd - wzStart) * t;
+      const px = from.x + (to.x - from.x) * t;
+      const py = from.y + (to.y - from.y) * t;
+      const pz = from.z + (to.z - from.z) * t;
       pts.push(new THREE.Vector3(px, py, pz));
     }
     const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
@@ -188,19 +207,26 @@ export class VerticalLinkRenderer {
 
     // Arrow cones
     const coneGeo = new THREE.ConeGeometry(0.12, 0.3, 6);
-    // Up arrow at top end
     const upMat = new THREE.MeshStandardMaterial({ color });
-    const upCone = new THREE.Mesh(coneGeo, upMat);
-    upCone.position.set(wxEnd, yTop, wzEnd);
-    this.group.add(upCone);
-    this._meshes.push(upCone);
+    const dirVec = new THREE.Vector3().subVectors(to, from).normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVec);
 
-    // Down arrow at bottom end
-    const downCone = new THREE.Mesh(coneGeo, upMat.clone());
-    downCone.position.set(wxStart, yBottom, wzStart);
-    downCone.rotation.z = Math.PI;
-    this.group.add(downCone);
-    this._meshes.push(downCone);
+    const createCone = (pos, rotQuat) => {
+      const cone = new THREE.Mesh(coneGeo, upMat.clone());
+      cone.position.copy(pos);
+      cone.quaternion.copy(rotQuat);
+      this.group.add(cone);
+      this._meshes.push(cone);
+    };
+
+    createCone(to, quat);
+    if (mode === 'bidirectional') {
+      const reverseQuat = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3().subVectors(from, to).normalize()
+      );
+      createCone(from, reverseQuat);
+    }
   }
 
   dispose() {

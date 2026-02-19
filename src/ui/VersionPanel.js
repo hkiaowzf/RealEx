@@ -4,6 +4,8 @@ import { Persistence } from '../utils/Persistence.js';
 
 export class VersionPanel {
   constructor() {
+    this._pendingRestoreIdx = null;
+    this._pendingRestoreTimer = null;
     this.overlay = document.createElement('div');
     this.overlay.className = 'export-overlay hidden';
     this.overlay.innerHTML = `
@@ -42,6 +44,7 @@ export class VersionPanel {
       return;
     }
     el.innerHTML = versions.map((v, i) => {
+      const pendingRestore = this._pendingRestoreIdx === i;
       const floors = v.exhibition?.floors?.length || 0;
       const booths = this._boothCount(v);
       const previewImg = v.preview
@@ -54,11 +57,19 @@ export class VersionPanel {
           <small>${v.exhibition?.name || ''} — ${floors} 层, ${booths} 展位</small>
         </div>
         <div class="version-actions">
-          <button class="btn-sm version-restore" data-idx="${i}">恢复</button>
+          <button class="btn-sm version-restore ${pendingRestore ? 'btn-danger' : ''}" data-idx="${i}">
+            ${pendingRestore ? '再次点击确认' : '恢复'}
+          </button>
           <button class="btn-sm version-delete" data-idx="${i}">&times;</button>
         </div>
       </div>`;
     }).join('');
+  }
+
+  _clearPendingRestore() {
+    this._pendingRestoreIdx = null;
+    clearTimeout(this._pendingRestoreTimer);
+    this._pendingRestoreTimer = null;
   }
 
   _saveVersion() {
@@ -100,20 +111,31 @@ export class VersionPanel {
     this.overlay.addEventListener('click', e => {
       if (e.target.classList.contains('export-overlay') ||
           e.target.classList.contains('export-close')) {
+        this._clearPendingRestore();
         this.hide();
         return;
       }
       const restoreBtn = e.target.closest('.version-restore');
       if (restoreBtn) {
         const idx = Number(restoreBtn.dataset.idx);
-        if (confirm('确定要恢复到此版本吗？当前未保存的更改将丢失。')) {
+        if (this._pendingRestoreIdx === idx) {
+          this._clearPendingRestore();
           Persistence.restoreVersion(store, idx);
           this.hide();
+          return;
         }
+        this._pendingRestoreIdx = idx;
+        clearTimeout(this._pendingRestoreTimer);
+        this._pendingRestoreTimer = setTimeout(() => {
+          this._clearPendingRestore();
+          this._renderList();
+        }, 1800);
+        this._renderList();
         return;
       }
       const deleteBtn = e.target.closest('.version-delete');
       if (deleteBtn) {
+        this._clearPendingRestore();
         Persistence.deleteVersion(Number(deleteBtn.dataset.idx));
         this._renderList();
       }

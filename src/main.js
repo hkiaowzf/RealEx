@@ -38,43 +38,109 @@ const saved = Persistence.load();
 if (saved && saved.exhibition) {
   Persistence.restore(store, saved);
 } else {
-  store.initExhibition({ name: '我的展览' });
-  // Floor 1
+  store.initExhibition({ name: '示例展览' });
   store.addFloor({ width: 30, depth: 30, label: 'L1' });
-  // Floor 2
   store.addFloor({ width: 30, depth: 30, label: 'L2' });
 
-  // Helper: seed a floor with demo elements
+  // Helper: create a rectangular booth from origin (ox, oz) with size (w, d)
+  const makeCells = (ox, oz, w, d) => {
+    const cells = [];
+    for (let dx = 0; dx < w; dx++)
+      for (let dz = 0; dz < d; dz++)
+        cells.push({ x: ox + dx, z: oz + dz });
+    return cells;
+  };
+
   const seedFloor = (floorIndex) => {
     store.setActiveFloor(floorIndex);
-    // Elevators at (3,3) and (3,4)
-    store.setCell(3, 3, CellType.ELEVATOR);
-    store.setCell(3, 4, CellType.ELEVATOR);
-    // Escalators at (5,3) and (5,4) — symmetric pair
-    store.setCell(5, 3, CellType.ESCALATOR);
-    store.setCell(5, 4, CellType.ESCALATOR);
-    // 3×3 booths at four positions
-    const boothOrigins = [[6,6],[12,6],[12,12],[12,20]];
-    for (const [ox, oz] of boothOrigins) {
-      const cells = [];
-      for (let dx = 0; dx < 3; dx++) {
-        for (let dz = 0; dz < 3; dz++) {
-          cells.push({ x: ox + dx, z: oz + dz });
-        }
-      }
-      store.addBooth(cells);
+
+    // --- Main corridors (cross pattern) ---
+    for (let i = 0; i < 30; i++) {
+      store.setCell(i, 14, CellType.CORRIDOR);
+      store.setCell(14, i, CellType.CORRIDOR);
     }
+    // Secondary corridors between booth rows
+    for (let x = 1; x < 14; x++) {
+      store.setCell(x, 5, CellType.CORRIDOR);
+      store.setCell(x, 20, CellType.CORRIDOR);
+    }
+    for (let x = 15; x < 29; x++) {
+      store.setCell(x, 5, CellType.CORRIDOR);
+      store.setCell(x, 20, CellType.CORRIDOR);
+    }
+
+    // --- Entrances ---
+    store.setCell(14, 0, CellType.ENTRANCE);
+    store.setCell(14, 29, CellType.ENTRANCE);
+    store.setCell(0, 14, CellType.ENTRANCE);
+    store.setCell(29, 14, CellType.ENTRANCE);
+
+    // --- Elevator group 1 (west) ---
+    store.setCell(1, 13, CellType.ELEVATOR);
+    store.setCell(2, 13, CellType.ELEVATOR);
+    // --- Elevator group 2 (east) ---
+    store.setCell(27, 13, CellType.ELEVATOR);
+    store.setCell(28, 13, CellType.ELEVATOR);
+
+    // --- Escalator group 1 (north) ---
+    store.setCell(13, 1, CellType.ESCALATOR);
+    store.setCell(13, 2, CellType.ESCALATOR);
+    // --- Escalator group 2 (south) ---
+    store.setCell(15, 27, CellType.ESCALATOR);
+    store.setCell(15, 28, CellType.ESCALATOR);
+
+    // --- Booths ---
+    // Top-left quadrant: 3x3 standard
+    const topLeft = [[1,1],[5,1],[9,1],[1,7],[5,7],[9,7],[1,10],[5,10],[9,10]];
+    for (const [ox, oz] of topLeft) store.addBooth(makeCells(ox, oz, 3, 3));
+
+    // Top-right quadrant: mix of 3x3 and 4x3
+    store.addBooth(makeCells(16, 1, 4, 3));
+    store.addBooth(makeCells(21, 1, 3, 3));
+    store.addBooth(makeCells(25, 1, 3, 3));
+    store.addBooth(makeCells(16, 7, 3, 3));
+    store.addBooth(makeCells(20, 7, 3, 3));
+    store.addBooth(makeCells(24, 7, 4, 3));
+
+    // Bottom-left quadrant: 3x3 standard
+    const bottomLeft = [[1,16],[5,16],[9,16],[1,22],[5,22],[9,22]];
+    for (const [ox, oz] of bottomLeft) store.addBooth(makeCells(ox, oz, 3, 3));
+
+    // Bottom-right quadrant: mix of 3x3 and 3x2
+    store.addBooth(makeCells(16, 16, 3, 3));
+    store.addBooth(makeCells(20, 16, 3, 2));
+    store.addBooth(makeCells(24, 16, 3, 3));
+    store.addBooth(makeCells(16, 22, 3, 3));
+    store.addBooth(makeCells(20, 22, 4, 3));
+    store.addBooth(makeCells(25, 22, 3, 3));
   };
+
   seedFloor(0);
   seedFloor(1);
 
-  // Link escalators between L1 and L2 (symmetric pair)
-  store.addEscalatorLink(0, 5, 3, 1, 5, 3, false);
-  store.addEscalatorLink(0, 5, 4, 1, 5, 4, false);
-
-  // Reset to L1
+  // Set some booth statuses for realism
   store.setActiveFloor(0);
-  // Clear undo stack so demo content is fully deletable without undo artifacts
+  const f0 = store.floors[0];
+  if (f0?.booths?.length > 3) {
+    store.updateBooth(f0.booths[2].id, { status: 'reserved' });
+    store.updateBooth(f0.booths[5].id, { status: 'sold', brandName: '示例品牌A' });
+    store.updateBooth(f0.booths[9].id, { status: 'reserved' });
+    store.updateBooth(f0.booths[12].id, { status: 'sold', brandName: '示例品牌B' });
+  }
+  store.setActiveFloor(1);
+  const f1 = store.floors[1];
+  if (f1?.booths?.length > 3) {
+    store.updateBooth(f1.booths[1].id, { status: 'reserved' });
+    store.updateBooth(f1.booths[7].id, { status: 'sold', brandName: '示例品牌C' });
+  }
+
+  // Link escalators between L1 and L2
+  store.addEscalatorLink(0, 13, 1, 1, 13, 1, false, 'up');
+  store.addEscalatorLink(0, 13, 2, 1, 13, 2, false, 'down');
+  store.addEscalatorLink(0, 15, 27, 1, 15, 27, false, 'up');
+  store.addEscalatorLink(0, 15, 28, 1, 15, 28, false, 'down');
+
+  store.setActiveFloor(0);
   store.undoStack = [];
 }
 store.sanitizeEscalatorLinks();
@@ -105,7 +171,7 @@ if (isTenantView) {
 }
 
 // Start auto-save
-Persistence.startAutoSave(store);
+const stopAutoSave = Persistence.startAutoSave(store);
 
 const editorArea = document.getElementById('editor-area');
 const viewportArea = document.getElementById('viewport-area');
@@ -339,6 +405,13 @@ if (isTenantView) {
 
 let sceneManager = null;
 const canvas3d = document.getElementById('scene3d');
+const ensurePreviewLayoutStable = (cb) => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      cb?.();
+    });
+  });
+};
 
 // --- Mode switching ---
 function updateMode() {
@@ -355,15 +428,25 @@ function updateMode() {
     editorArea.classList.add('hidden');
     viewportArea.classList.remove('hidden');
     if (!sceneManager) {
-      sceneManager = new SceneManager(canvas3d, { lockZoom: isTenantView, tenantView: isTenantView });
-      vpControls.setSceneManager(sceneManager);
+      try {
+        sceneManager = new SceneManager(canvas3d, { lockZoom: isTenantView, tenantView: isTenantView });
+        vpControls.setSceneManager(sceneManager);
+      } catch (err) {
+        console.error('3D init failed:', err);
+        bus.emit('toast', { message: '当前设备无法初始化 3D 预览，已切回平面视图', duration: 2200 });
+        store.setEditMode('edit');
+        return;
+      }
     }
     sceneManager.rebuildAll();
-    if (isTenantView) {
-      sceneManager.fitToGoldenView();
-    } else {
-      sceneManager._onResize();
-    }
+    ensurePreviewLayoutStable(() => {
+      sceneManager?._onResize?.();
+      if (isTenantView) {
+        sceneManager?.fitToGoldenView?.();
+      } else {
+        sceneManager?.fitToView?.();
+      }
+    });
   }
 }
 
@@ -399,7 +482,7 @@ window.addEventListener('orientationchange', () => {
 // Mode switch auto-fit on mobile
 bus.on('edit-mode-changed', () => {
   if (!mobileQuery.matches) return;
-  requestAnimationFrame(() => {
+  ensurePreviewLayoutStable(() => {
     if (store.editMode === 'edit') {
       gridEditor.fitToView();
     } else {
@@ -437,6 +520,7 @@ window.addEventListener('keydown', e => {
   // Keep global meta shortcuts available even when IME is active.
   if ((e.isComposing || e.keyCode === 229) && !isMeta) return;
   // For non-shortcut typing inside inputs, do nothing.
+  if (isEditableTarget && (isEditShortcut || isPreviewShortcut || isFitShortcut)) return;
   if (isEditableTarget && !isMeta) return;
   e.preventDefault();
   if (isPreviewShortcut) {
@@ -458,6 +542,7 @@ window.addEventListener('keydown', e => {
 }, { capture: true });
 
 window.addEventListener('beforeunload', () => {
+  try { stopAutoSave?.(); } catch {}
   try { offEditModeChanged?.(); } catch {}
   try { vpControls?.destroy?.(); } catch {}
   try { canvasActionBar?.destroy?.(); } catch {}
